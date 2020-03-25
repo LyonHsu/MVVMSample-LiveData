@@ -1,252 +1,85 @@
 # MVVMSample
-一個MVVM+Data Binding的架構
+一個MVVM+LiveData的架構
 
-https://ithelp.ithome.com.tw/articles/10192829
+https://ithelp.ithome.com.tw/articles/10193296
 
-在各種程式語言和架構中，關注點分離(Separation of Concerns)一直都是非常重要的原則，而Android原本的架構在這方面就做的不是很好。原架構雖然說是MVC，但顯示UI及邏輯處理都是在Activity/Fragment中，變成V跟C混在一起而難以測試維護。
+試想一種情境：當我們執行下載檔案之類的耗時任務，要在任務完成時發出Toast通知使用者，可以怎麼做？
 
-因應這情況，開發者們陸續發展出MVP和MVVM這兩個主流架構，兩者沒有優劣之分，我個人覺得MVVM的概念和之後要實作的Architecture Components很像，所以系列文章就從建立一個最簡單的MVVM開始，再陸續加入其他功能和library。
-
-MVVM架構
-MVVM是Model-View-ViewModel的簡稱，三者扮演的角色為：
-
-    Model：管理資料來源如API和本地資料庫
-    View：顯示UI和接收使用者動作
-    ViewModel：從Model取得View所需的資料
-...
-    https://ithelp.ithome.com.tw/upload/images/20171222/20103849tCKSYwze3T.png
-　　　　　　　　　　　Model-View-ViewModel class structure
-
-View是Activity、Fragment或custom view，本身不做邏輯處理，當使用者跟UI有互動時將指令傳給ViewModel處理，透過其獲得所需的資料並顯示。
-
-ViewModel接收View的指令並對Model請求資料，將取得的資料保存起來供View使用。
-
-Model管理所有的資料來源，例如API、資料庫和SharedPreference，當ViewModel來請求資料時從正確的來源取得資料並回傳。
-
-Code Sample
-我們直接做一個最簡單的MVVM範例，功能只要「使用者按下按鈕時，更新畫面上的文字」。
-
-從Model開始，建立一個class DataModel，返回一個字串資料，最簡單的寫法是這樣：
-
-    public class DataModel {
-
-        public String retrieveData() {
-            return "New Data";
-        }
-    }
-不過通常取得資料都是非同步(async)的，所以我們模擬一下：
-
-    public class DataModel {
-        public void retrieveData(final onDataReadyCallback callback) {
-            new Handler().postDelayed(new Runnable() {
-                @Override
-                public void run() {
-                    callback.onDataReady("New Data");
-                }
-            }, 1500);
-        }
-        interface onDataReadyCallback {
-            void onDataReady(String data);
-        }
-    }
-我們新增一個interface onDataReadyCallback，並用Handler做個1.5秒的延遲模擬從API請求資料的情況，當取得資料時透過onDataReady將資料返回。
-
-接著是ViewModel，功能很簡單就是呼叫Model的取得資料method就好
-
-    public class MainViewModel {
-        private DataModel dataModel = new DataModel();
-        public void refresh() {
-            dataModel.retrieveData(new DataModel.onDataReadyCallback() {
-                @Override
-                public void onDataReady(String data) {
-                    // TODO: exposes data to View
-                }
-            });
-        }
-    }
-此時就是MVVM和MVP最不同的地方，ViewModel並不使用callback的方式來通知View，而是用Observer pattern的概念，由View來訂閱(subscribe)ViewModel中它要的資料，並在資料異動時才更新UI，因此，MVVM都會搭配如Data Binding等library來實現Observer pattern。
-
-在加入Data Binding之前，先看看View的原樣，即我們的Activity：
-
-    <?xml version="1.0" encoding="utf-8"?>
-    <android.support.constraint.ConstraintLayout
-        xmlns:android="http://schemas.android.com/apk/res/android"
-        xmlns:app="http://schemas.android.com/apk/res-auto"
-        xmlns:tools="http://schemas.android.com/tools"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        tools:context="ivankuo.com.itbon2018.MainActivity">
-
-        <Button
-            android:id="@+id/btnRefresh"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Refresh"
-            app:layout_constraintLeft_toLeftOf="parent"
-            app:layout_constraintTop_toTopOf="parent"/>
-
-        <ProgressBar
-            android:id="@+id/progressBar"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintLeft_toLeftOf="parent"
-            app:layout_constraintRight_toRightOf="parent"
-            app:layout_constraintTop_toTopOf="parent" />
-
-        <TextView
-            android:id="@+id/txtHelloWord"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Hello World!"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintLeft_toLeftOf="parent"
-            app:layout_constraintRight_toRightOf="parent"
-            app:layout_constraintTop_toTopOf="parent" />
-
-    </android.support.constraint.ConstraintLayout>
-畫面有一個Button用來觸發資料更新，ProgressBar用來表示讀取中和TextView顯示更新後的資料。
+以目前的程式可以用Data Binding的addOnPropertyChangedCallback來做，將MainActivity修改如下：
 
     public class MainActivity extends AppCompatActivity {
 
-        private Button btnRefresh;
-
-        private MainViewModel viewModel = new MainViewModel();
-
-        @Override
-        protected void onCreate(Bundle savedInstanceState) {
-            super.onCreate(savedInstanceState);
-            setContentView(R.layout.main_activity);
-
-            btnRefresh = findViewById(R.id.btnRefresh);
-            btnRefresh.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View view) {
-                    viewModel.refresh();
-                }
-            });
-
-            // TODO: 使用Data Binding訂閱ViewModel中的資料以更新畫面
-        }
-    }
-按下Button時會呼叫ViewModel更新資料，接著須完成的就是用Data Binding讓View的資料能自動更新。
-
-Data Binding
-Data Bindin是官方提供的library，專門用來處理View的更新。只要在module gradle中加入下面這段就可以啟用Data Binding：
-
-    android {
-        ....
-        dataBinding {
-            enabled = true
-        }
-    }
-記得按Sync Now讓專案重新build，啟用之後修改一下main_activity.xml，在最外層用<layout>將內容包起來：
-
-    <?xml version="1.0" encoding="utf-8"?>
-    <layout xmlns:android="http://schemas.android.com/apk/res/android"
-        xmlns:app="http://schemas.android.com/apk/res-auto"
-        xmlns:tools="http://schemas.android.com/tools">
-
-        <android.support.constraint.ConstraintLayout
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            tools:context="ivankuo.com.itbon2018.MainActivity">
-
-            <Button
-                android:id="@+id/btnRefresh"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Refresh"
-                app:layout_constraintLeft_toLeftOf="parent"
-                app:layout_constraintTop_toTopOf="parent" />
-
-            <ProgressBar
-                android:id="@+id/progressBar"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                app:layout_constraintBottom_toBottomOf="parent"
-                app:layout_constraintLeft_toLeftOf="parent"
-                app:layout_constraintRight_toRightOf="parent"
-                app:layout_constraintTop_toTopOf="parent" />
-
-            <TextView
-                android:id="@+id/txtHelloWord"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Hello World!"
-                app:layout_constraintBottom_toBottomOf="parent"
-                app:layout_constraintLeft_toLeftOf="parent"
-                app:layout_constraintRight_toRightOf="parent"
-                app:layout_constraintTop_toTopOf="parent" />
-
-        </android.support.constraint.ConstraintLayout>
-
-    </layout>
-接著用Android Studio的Build -> Make Project或快速鍵Ctrl+F9重新build專案，系統會依照xml的檔名自動產生Binding所需的class，例如xml名稱為main_activity.xml，系統會產生MainActivityBinding供我們使用，規則是首字大寫、去除底線並令底線後的首字大寫。
-
-
-
-修改MainActivity：
-
-    public class MainActivity extends AppCompatActivity {
-
-        private MainActivityBinding binding;
-
-        private MainViewModel viewModel = new MainViewModel();
+        ...
 
         @Override
         protected void onCreate(Bundle savedInstanceState) {
             super.onCreate(savedInstanceState);
             binding = DataBindingUtil.setContentView(this, R.layout.main_activity);
-
-            binding.btnRefresh.setOnClickListener(new View.OnClickListener() {
+            ...
+            viewModel.mData.addOnPropertyChangedCallback(new Observable.OnPropertyChangedCallback() {
                 @Override
-                public void onClick(View view) {
-                    viewModel.refresh();
+                public void onPropertyChanged(Observable observable, int i) {
+                    Toast.makeText(MainActivity.this, "下載完成", Toast.LENGTH_SHORT).show();
                 }
             });
-
-            // TODO: 使用Data Binding訂閱ViewModel中的資料以更新畫面
         }
     }
-原本setContentView需改成用DataBindingUtil來完成，透過binding，我們可以直接呼叫xml中的元件，如上例用binding.btnRefresh就可以控制該按鈕。
+對MainViewModel中的mData增加callback，當值發生改變時觸發並顯示Toast，執行結果：
 
-這樣的方式相較ButterKnife更為方便，新增元件時ButterKnife要在程式裡用@Bind綁定，而Data Binding可以直接用binding.就取得元件。刪除元件時更是如此，ButterKnife如果xml中的元件刪掉但忘了刪程式裡的@Bind就會發生Runtime exception，Data Binding則會在compile時就報錯。
 
-接著是最後步驟，用Data Binding中的Observable來讓View和ViewModel溝通。
+但是，如果這個任務耗時更久，當它完成時使用者已經返回桌面做其他操作了呢？將DataModel的delay從1500改成3000來模擬：
 
-先在MainViewModel新增我們要的欄位：一個String保存資料，以及一個boolean表示目前是否在讀取資料中以顯示ProgressBar
+離開畫面後Toast還是出現了，導致使用者已經在用其他app卻突然看到我們的Toast訊息，影響其使用體驗。
 
-    public class MainViewModel {
+要解決這個問題，我們需要一種observable可以達到：
 
-        public final ObservableField<String> mData = new ObservableField<>();
+當value發生改變時發出callback通知
+只有View的生命週期在前景(foreground)時才發出通知
+第1點並不太特別，各個observable library都做得到，然而，第2點lifecycle-aware就是今天的主角LiveData才能辦到。
 
-        public final ObservableBoolean isLoading = new ObservableBoolean(false);
+LiveData
+如上所述，LiveData最強大的地方在於lifecycle-aware特性，當LiveData的value發生改變時，若View在前景便會直接發送，而View在背景的話，value將會被保留(hold)住，直到回到前景時才發送。此外，當View被destroy時，LiveData也會自動停止observe行為，避免造成memory-leak。
 
-        private DataModel dataModel = new DataModel();
+加入dependencies，跟昨天的ViewModel同屬於lifecycle component，如果昨天有加過今天就不用了。
+
+    // ViewModel and LiveData
+    implementation "android.arch.lifecycle:extensions:1.0.0"
+    annotationProcessor "android.arch.lifecycle:compiler:1.0.0"
+修改MainViewModel，將mData改成MutableLiveData
+
+    public class MainViewModel extends ViewModel {
+
+        ...
+
+        public final MutableLiveData<String> mData = new MutableLiveData<>();
+
+        ...
 
         public void refresh() {
 
-            isLoading.set(true);
+            ...
 
             dataModel.retrieveData(new DataModel.onDataReadyCallback() {
                 @Override
                 public void onDataReady(String data) {
-                    mData.set(data);
-                    isLoading.set(false);
+                    mData.setValue(data);
+                    ...
                 }
             });
         }
     }
-加入ObservableField用來存放資料，以及ObservableBoolean控制ProgressBar的顯示與否，在refresh()中依照情況用set()更新它們的value，記得要用public才可以被別人訂閱。
+MutableLiveData是方便我們使用的LiveData子類別，提供setValue()和postValue()兩種方式更新value，差異在於前者是在main thread執行，若需要在background thread則改用後者。
 
-接著要讓MainActivity能觀察到MainViewModel中數值的改變，在main_activity.xml中加入<data>
+因為mData已經改用LiveData了，所以在main_activity.xml中修改一下TextView，刪掉Data Binding那一行
 
+    <?xml version="1.0" encoding="utf-8"?>
     <layout xmlns:android="http://schemas.android.com/apk/res/android"
         xmlns:app="http://schemas.android.com/apk/res-auto"
         xmlns:tools="http://schemas.android.com/tools">
 
         <data>
+
+            <import type="android.view.View" />
 
             <variable
                 name="viewModel"
@@ -261,91 +94,144 @@ Data Bindin是官方提供的library，專門用來處理View的更新。只要�
 
             ...
 
-        </android.support.constraint.ConstraintLayout>
-
-    </layout>
-在<data>中加入了MainViewModel因為我們的Oberverble變數都在其中，接著就可以開始寫元件和那兩個變數的互動：
-
-    <?xml version="1.0" encoding="utf-8"?>
-    <layout xmlns:android="http://schemas.android.com/apk/res/android"
-        xmlns:app="http://schemas.android.com/apk/res-auto"
-        xmlns:tools="http://schemas.android.com/tools">
-        ...
-
-            <Button
-                android:id="@+id/btnRefresh"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Refresh"
-                android:enabled="@{viewModel.isLoading ? false : true}"
-                ... />
-
-            <ProgressBar
-                android:id="@+id/progressBar"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:visibility="@{viewModel.isLoading ? View.VISIBLE : View.GONE}"
-                ... />
-
             <TextView
                 android:id="@+id/txtHelloWord"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="@{viewModel.mData}"
+                app:layout_constraintBottom_toBottomOf="parent"
                 ... />
 
         </android.support.constraint.ConstraintLayout>
 
     </layout>
-依照MainViewModel中的isLoading欄位決定Button的enable及ProgressBar是否顯示，而TextView的文字就放MainViewModel取得的data。
-
-因為用到View.VISIBLE的關係，須在<data>中import不然會報錯
-
-    <data>
-
-        <import type="android.view.View"/>
-
-        <variable
-            name="viewModel"
-            type="ivankuo.com.itbon2018.MainViewModel" />
-
-    </data>
-最後，在Activity中加上setViewModel
-
-    @Override
-        protected void onCreate(Bundle savedInstanceState) {
-            super.onCreate(savedInstanceState);
-            binding = DataBindingUtil.setContentView(this, R.layout.main_activity);
-
-            binding.setViewModel(viewModel);
-
-            binding.btnRefresh.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View view) {
-                    viewModel.refresh();
-                }
-            });
-        }
-setViewModel這個method也是由Data Binding自動產生的，因為在<data>中我們變數名為viewModel。此外Data Binding也可以綁定事件，例如onClick
-
-    <Button
-        android:id="@+id/btnRefresh"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Refresh"
-        android:enabled="@{viewModel.isLoading ? false : true}"
-        android:onClick="@{() -> viewModel.refresh()}"
-        ... />
-這樣的話Activity中的setOnClickListener也不用寫了
+  MainActivity中接收mData的callback
 
     public class MainActivity extends AppCompatActivity {
 
         ...
+
         @Override
         protected void onCreate(Bundle savedInstanceState) {
             super.onCreate(savedInstanceState);
-            binding = DataBindingUtil.setContentView(this, R.layout.main_activity);
-            binding.setViewModel(viewModel);
+            ...
+
+            viewModel.mData.observe(this, new Observer<String>() {
+                @Override
+                public void onChanged(@Nullable String data) {
+                    binding.txtHelloWord.setText(data);
+                    Toast.makeText(MainActivity.this, "下載完成", Toast.LENGTH_SHORT).show();
+                }
+            });
         }
     }
-這樣就是一個MVVM+Data Binding的架構了，View負責顯示UI，並用Data Binding和ViewModel連結；ViewModel只要用set()處理本身的Observerble欄位，不需要知道是誰在取用這些資料；Model也只提供method讓外部請求資料，這部分將來建立起api和資料庫時會比較清楚。
+使用observe(owner, Observer)來接收callback，owner用this表示LiveData會遵照MainActivity的生命週期判斷是否發送變更。
+
+將delay縮短至1500並再次執行，就會看到Toast在app回到前景時才顯示：
+
+
+SingleLiveEvent
+上面的程式還有一個問題，當畫面旋轉時，Toast會再出現一次：
+
+因為View在重新create後會立即收到LiveData的value，所以又觸發了一次onChanged()並顯示Toast。
+
+因應這種情況，Google寫了SingleLiveEvent這個class來處理
+
+    public class SingleLiveEvent<T> extends MutableLiveData<T> {
+
+        private static final String TAG = "SingleLiveEvent";
+
+        private final AtomicBoolean mPending = new AtomicBoolean(false);
+
+        @MainThread
+        public void observe(LifecycleOwner owner, final Observer<T> observer) {
+
+            if (hasActiveObservers()) {
+                Log.w(TAG, "Multiple observers registered but only one will be notified of changes.");
+            }
+
+            // Observe the internal MutableLiveData
+            super.observe(owner, new Observer<T>() {
+                @Override
+                public void onChanged(@Nullable T t) {
+                    if (mPending.compareAndSet(true, false)) {
+                        observer.onChanged(t);
+                    }
+                }
+            });
+        }
+
+        @MainThread
+        public void setValue(@Nullable T t) {
+            mPending.set(true);
+            super.setValue(t);
+        }
+
+        /**
+         * Used for cases where T is Void, to make calls cleaner.
+         */
+        @MainThread
+        public void call() {
+            setValue(null);
+        }
+    }
+SingleLiveEvent只會發送更新的value，原value若已經發送過就不會再次發送，即避免了configuration change後又顯示一次同樣內容的問題。因此對於提示訊息、畫面跳轉等動作就很適合用SingleLiveEvent來處理，使用方式跟MutableLiveData一樣。
+
+我們修改ViewModel將提示訊息改用SingleLiveEvent處理
+
+    public class MainViewModel extends ViewModel {
+
+        ...
+
+        public final MutableLiveData<String> mData = new MutableLiveData<>();
+
+        public final SingleLiveEvent<String> toastText = new SingleLiveEvent<>();
+
+        ...
+
+        public void refresh() {
+
+            isLoading.set(true);
+
+            dataModel.retrieveData(new DataModel.onDataReadyCallback() {
+                @Override
+                public void onDataReady(String data) {
+                    mData.setValue(data);
+                    toastText.setValue("下載完成");
+                    isLoading.set(false);
+                }
+            });
+        }
+    }
+修改MainActivity：
+
+    public class MainActivity extends AppCompatActivity {
+
+        ...
+
+        @Override
+        protected void onCreate(Bundle savedInstanceState) {
+            super.onCreate(savedInstanceState);
+            ...
+            viewModel.mData.observe(this, new Observer<String>() {
+                @Override
+                public void onChanged(@Nullable String data) {
+                    binding.txtHelloWord.setText(data);
+                }
+            });
+
+            viewModel.toastText.observe(this, new Observer<String>() {
+                @Override
+                public void onChanged(@Nullable String text) {
+                    Toast.makeText(MainActivity.this, text, Toast.LENGTH_SHORT).show();
+                }
+            });
+        }
+    }
+將主要資料mData和toast分開，當首次載入資料時兩者都會觸發，在configuration change發生之後，mData會立即觸發讓畫面上顯示資料，而toastText因為value並沒有透過setValue()更新過，所以不會再次觸發。
+
+執行結果：
+
+
+LiveData跟Data Binding角色有一點重疊，一般而言我會讓Data Binding處理元件的visible這類屬性，而主要顯示在UI的資料用LiveData以免除各種lifecycle衍生的問題。
+
+Google也正在修改Data Binding library讓它也具有lifecycle-aware的特性，有興趣的可以留意#issue34
