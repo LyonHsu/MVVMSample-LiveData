@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--使用Data Binding 需要使用layout包起xml 內容-->
+<layout  xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!--讓MainActivity能觀察到MainViewModel中數值的改變，在main_activity.xml中加入<data>-->
+    <data>
+        <!--因為用到View.VISIBLE的關係，須在<data>中import不然會報錯-->
+        <import type="android.view.View"/>
+        <variable
+            name="viewModel"
+            type="lyon.model.view.viewmodel.MainViewModel" />
+        <variable
+            name="viewModel2"
+            type="lyon.model.view.viewmodel.MainViewModel" />
+    </data>
+
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        tools:context=".MainActivity">
+
+        <Button
+            android:id="@+id/btnRefresh"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Refresh"
+            android:enabled="@{viewModel.isLoading ? false : true}"
+            app:layout_constraintLeft_toLeftOf="parent"
+            app:layout_constraintTop_toTopOf="parent"/>
+
+        <ProgressBar
+            android:id="@+id/progressBar"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_centerHorizontal="true"
+            android:layout_centerVertical="true"
+            android:visibility="@{viewModel.isLoading ? View.VISIBLE : View.GONE}"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintLeft_toLeftOf="parent"
+            app:layout_constraintRight_toRightOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <!--因為mData已經改用LiveData了，所以在main_activity.xml中修改一下TextView，刪掉Data Binding那一行-->
+        <!--android:text="@{viewModel.mData}"-->
+        <TextView
+            android:id="@+id/txtHelloWord"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:hint="Hello World!"
+            android:layout_centerHorizontal="true"
+            android:layout_centerVertical="true"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintLeft_toLeftOf="parent"
+            app:layout_constraintRight_toRightOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+    </RelativeLayout>
+</layout>
