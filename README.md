@@ -134,7 +134,7 @@ SingleLiveEvent
 
 因為View在重新create後會立即收到LiveData的value，所以又觸發了一次onChanged()並顯示Toast。
 
-因應這種情況，Google寫了SingleLiveEvent這個class來處理
+因應這種情況，Google寫了SingleLiveEvent這個class來處理(在kotlin 中沒有發現此檔案，所以自行建置了一個)
 
     public class SingleLiveEvent<T> extends MutableLiveData<T> {
 
